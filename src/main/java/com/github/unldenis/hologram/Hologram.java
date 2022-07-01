@@ -32,6 +32,7 @@ import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -49,10 +50,10 @@ public class Hologram {
     private final Placeholders placeholders;
 
     /**
-     * @param plugin The org.bukkit.Plugin
-     * @param location The location of the hologram
+     * @param plugin       The org.bukkit.Plugin
+     * @param location     The location of the hologram
      * @param placeholders Reference passage of placeholders
-     * @param l Inverted array of hologram lines
+     * @param l            Inverted array of hologram lines
      * @deprecated Deprecated because you have to use the Builder of the class.
      */
     @Deprecated
@@ -69,24 +70,24 @@ public class Hologram {
 
         LinkedList<AbstractLine<?>> tempReversed = new LinkedList<>();
         Location cloned = this.location.clone().subtract(0, 0.28, 0);
-        for(int j=0; j< l.length; j++) {
+        for (int j = 0; j < l.length; j++) {
             Object[] line = l[j];
             double up = 0.28D;
-            if(j>0 && l[j-1].length == 1 /* ItemStack */) {
+            if (j > 0 && l[j - 1].length == 1 /* ItemStack */) {
                 up = 0.0D;
             }
             Object val = line[0];
-            if(val instanceof String) {
+            if (val instanceof String) {
                 TextLine tempLine = new TextLine(this, (String) val, (boolean) line[1]);
                 tempLine.setLocation(cloned.add(0.0, up, 0).clone());
                 tempReversed.addFirst(tempLine);
-            }else if (val instanceof ItemStack) {
+            } else if (val instanceof ItemStack) {
                 ItemLine tempLine = new ItemLine(this, (ItemStack) val);
                 tempLine.setLocation(cloned.add(0.0, 0.60D, 0).clone());
                 tempReversed.addFirst(tempLine);
             }
         }
-        this.lines = Collections.unmodifiableList(tempReversed);
+        this.lines = tempReversed;
     }
 
     /**
@@ -159,9 +160,9 @@ public class Hologram {
     }
 
 
-    public void addLine(String text) {
+    public void addLine(String text, boolean clickable) {
         Location cloned = this.location.clone().subtract(0, 0.28, 0);
-        AbstractLine<String> line = new TextLine(this, text);
+        AbstractLine<String> line = new TextLine(this, text, clickable);
         line.setLocation(cloned.add(0.0, 0.28D, 0).clone());
         this.lines.add(line);
         this.seeingPlayers.forEach(line::update);
@@ -205,7 +206,7 @@ public class Hologram {
 
     @NotNull
     public List<AbstractLine<?>> getLines() {
-        return lines;
+        return Collections.unmodifiableList(lines);
     }
 
     protected void removeSeeingPlayer(Player player) {
@@ -253,14 +254,14 @@ public class Hologram {
         @NotNull
         public Builder addLine(@NotNull String line, boolean clickable) {
             Validate.notNull(line, "Line cannot be null");
-            this.lines.addFirst(new Object[]{ line, clickable});
+            this.lines.addFirst(new Object[]{line, clickable});
             return this;
         }
 
         @NotNull
         public Builder addLine(@NotNull ItemStack item) {
             Validate.notNull(item, "Item cannot be null");
-            this.lines.addFirst(new Object[]{ item });
+            this.lines.addFirst(new Object[]{item});
             return this;
         }
 
