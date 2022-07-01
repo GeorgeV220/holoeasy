@@ -38,7 +38,7 @@ public abstract class AbstractLine<T> {
     protected Optional<Animation> animation = Optional.empty();
     private int taskID = -1;
 
-    private final EntityDestroyPacket entityDestroyPacket;
+    private final PacketContainerSendable entityDestroyPacket;
 
     public AbstractLine(
             @NotNull Hologram hologram,
@@ -47,8 +47,7 @@ public abstract class AbstractLine<T> {
         this.hologram = hologram;
         this.entityID = HologramPool.IDs_COUNTER.getAndIncrement();
         this.obj = obj;
-        entityDestroyPacket = new EntityDestroyPacket(entityID);
-        entityDestroyPacket.load();
+        entityDestroyPacket = PacketsFactory.get().destroyPacket(entityID);
     }
 
     protected void hide(@NotNull Player player) {
@@ -56,8 +55,8 @@ public abstract class AbstractLine<T> {
     }
 
     protected void show(@NotNull Player player) {
-        new SpawnEntityLivingPacket(entityID, location, hologram.getPlugin())
-                .load()
+        PacketsFactory.get()
+                .spawnPacket(entityID, location, hologram.getPlugin())
                 .send(player);
     }
 
@@ -67,8 +66,8 @@ public abstract class AbstractLine<T> {
      * @since 1.2-SNAPSHOT
      */
     protected void teleport(@NotNull Player player) {
-        new EntityTeleportPacket(entityID, location)
-                .load()
+        PacketsFactory.get()
+                .teleportPacket(entityID, location)
                 .send(player);
     }
 
@@ -77,6 +76,10 @@ public abstract class AbstractLine<T> {
     }
 
     protected abstract void update(@NotNull Player player);
+
+    @NotNull
+    @Unmodifiable
+    public abstract T get();
 
     public void set(T newObj) {
         Validate.notNull(newObj, "New line cannot be null");
@@ -91,12 +94,11 @@ public abstract class AbstractLine<T> {
 
     public void setAnimation(@NotNull Animation a) {
         Validate.notNull(animation, "Animation cannot be null");
-        Animation animation = a.clone();
+        Animation animation = a.newInstance();
 
         this.animation = Optional.of(animation);
-        animation.setEntityID(this.entityID);
 
-        Runnable taskR = ()-> hologram.seeingPlayers.forEach(animation::nextFrame);
+        Runnable taskR = ()-> hologram.seeingPlayers.forEach(player -> animation.nextFrame(player, entityID, location));
         BukkitTask task;
         if(animation.async()) {
             task = Bukkit.getScheduler().runTaskTimerAsynchronously(hologram.getPlugin(), taskR, animation.delay(), animation.delay());
@@ -106,6 +108,11 @@ public abstract class AbstractLine<T> {
         this.taskID = task.getTaskId();
     }
 
+    public void setAnimation(Animation.AnimationType animationType) {
+        Validate.notNull(animationType, "AnimationType cannot be null");
+        setAnimation(animationType.type);
+    }
+
     public void removeAnimation() {
         if(taskID != -1) {
             Bukkit.getScheduler().cancelTask(taskID);
@@ -113,11 +120,15 @@ public abstract class AbstractLine<T> {
         }
     }
 
-
-    public @NotNull Location getLocation() {
-        return location;
+    @NotNull
+    @Unmodifiable
+    public Location getLocation() {
+        return location.clone();
     }
 
+    public Hologram getHologram() {
+        return hologram;
+    }
 
     @Override
     public boolean equals(Object o) {

@@ -19,10 +19,8 @@
 
 package com.github.unldenis.hologram;
 
-import com.github.unldenis.hologram.event.PlayerHologramHideEvent;
-import com.github.unldenis.hologram.event.PlayerHologramShowEvent;
+import com.github.unldenis.hologram.event.*;
 import com.github.unldenis.hologram.line.ItemLine;
-import com.github.unldenis.hologram.line.TextLine;
 import com.github.unldenis.hologram.placeholder.Placeholders;
 import com.google.common.collect.Lists;
 import org.apache.commons.lang.Validate;
@@ -44,17 +42,17 @@ public class Hologram {
     private final Plugin plugin;
     private Location location;
 
-    protected List<AbstractLine<?>> lines;
-    protected Collection<Player> seeingPlayers;
+    protected final List<AbstractLine<?>> lines;
+    protected final Set<Player> seeingPlayers = new CopyOnWriteArraySet<>();
+    protected final Set<Player> excludedPlayers = new CopyOnWriteArraySet<>();
 
     private final Placeholders placeholders;
 
     /**
-     * @param plugin        The org.bukkit.Plugin
-     * @param location      The location of the hologram
-     * @param placeholders  Reference passage of placeholders
-     * @param seeingPlayers Visible player reference, used when changing lines or in animations
-     * @param l             Inverted array of hologram lines
+     * @param plugin The org.bukkit.Plugin
+     * @param location The location of the hologram
+     * @param placeholders Reference passage of placeholders
+     * @param l Inverted array of hologram lines
      * @deprecated Deprecated because you have to use the Builder of the class.
      */
     @Deprecated
@@ -63,34 +61,32 @@ public class Hologram {
             @NotNull Plugin plugin,
             @NotNull Location location,
             @Nullable Placeholders placeholders,
-            @NotNull Collection<Player> seeingPlayers,
-            @NotNull Object... l
+            @NotNull Object[]... l
     ) {
         this.plugin = plugin;
         this.location = location;
         this.placeholders = placeholders == null ? new Placeholders() : placeholders;
-        this.seeingPlayers = seeingPlayers;
 
-        List<AbstractLine<?>> tempReversed = new LinkedList<>();
+        LinkedList<AbstractLine<?>> tempReversed = new LinkedList<>();
         Location cloned = this.location.clone().subtract(0, 0.28, 0);
-        for (int j = 0; j < l.length; j++) {
-            Object line = l[j];
+        for(int j=0; j< l.length; j++) {
+            Object[] line = l[j];
             double up = 0.28D;
-            if (j > 0 && l[j - 1] instanceof ItemStack) {
+            if(j>0 && l[j-1].length == 1 /* ItemStack */) {
                 up = 0.0D;
             }
-            if (line instanceof String) {
-                TextLine tempLine = new TextLine(this, (String) line);
+            Object val = line[0];
+            if(val instanceof String) {
+                TextLine tempLine = new TextLine(this, (String) val, (boolean) line[1]);
                 tempLine.setLocation(cloned.add(0.0, up, 0).clone());
-                tempReversed.add(tempLine);
-            } else if (line instanceof ItemStack) {
-                ItemLine tempLine = new ItemLine(this, (ItemStack) line);
+                tempReversed.addFirst(tempLine);
+            }else if (val instanceof ItemStack) {
+                ItemLine tempLine = new ItemLine(this, (ItemStack) val);
                 tempLine.setLocation(cloned.add(0.0, 0.60D, 0).clone());
-                tempReversed.add(tempLine);
+                tempReversed.addFirst(tempLine);
             }
         }
-        Collections.reverse(tempReversed);
-        this.lines = Lists.newArrayList(tempReversed);
+        this.lines = Collections.unmodifiableList(tempReversed);
     }
 
     /**
@@ -190,19 +186,42 @@ public class Hologram {
         return this.seeingPlayers.contains(player);
     }
 
+    public void addExcludedPlayer(@NotNull Player player) {
+        this.excludedPlayers.add(player);
+    }
+
+    public void removeExcludedPlayer(@NotNull Player player) {
+        this.excludedPlayers.remove(player);
+    }
+
+    @NotNull
+    public Set<Player> getExcludedPlayers() {
+        return excludedPlayers;
+    }
+
+    public boolean isExcluded(@NotNull Player player) {
+        return this.excludedPlayers.contains(player);
+    }
+
     @NotNull
     public List<AbstractLine<?>> getLines() {
         return lines;
     }
 
-    @NotNull
-    public Collection<Player> getSeeingPlayers() {
-        return Lists.newArrayList(seeingPlayers);
+    protected void removeSeeingPlayer(Player player) {
+        this.seeingPlayers.remove(player);
     }
 
     @NotNull
+    @Unmodifiable
+    public Set<Player> getSeeingPlayers() {
+        return Collections.unmodifiableSet(seeingPlayers);
+    }
+
+    @NotNull
+    @Unmodifiable
     public Location getLocation() {
-        return location;
+        return location.clone();
     }
 
     @NotNull
@@ -224,22 +243,24 @@ public class Hologram {
     }
 
     public static class Builder {
+        private static final Object[][] CACHE_ARR = new Object[0][0];
 
-        private final ConcurrentLinkedDeque<Object> lines = new ConcurrentLinkedDeque<>();
+        private final ConcurrentLinkedDeque<Object[]> lines = new ConcurrentLinkedDeque<>();
         private Location location;
         private final Placeholders placeholders = new Placeholders();
 
+
         @NotNull
-        public Builder addLine(@NotNull String line) {
+        public Builder addLine(@NotNull String line, boolean clickable) {
             Validate.notNull(line, "Line cannot be null");
-            this.lines.addFirst(line);
+            this.lines.addFirst(new Object[]{ line, clickable});
             return this;
         }
 
         @NotNull
         public Builder addLine(@NotNull ItemStack item) {
             Validate.notNull(item, "Item cannot be null");
-            this.lines.addFirst(item);
+            this.lines.addFirst(new Object[]{ item });
             return this;
         }
 
@@ -261,7 +282,7 @@ public class Hologram {
             if (location == null || lines.isEmpty() || pool == null) {
                 throw new IllegalArgumentException("No location given or not completed");
             }
-            Hologram hologram = new Hologram(pool.getPlugin(), this.location, this.placeholders, new CopyOnWriteArraySet<>(), this.lines.toArray());
+            Hologram hologram = new Hologram(pool.getPlugin(), this.location, this.placeholders, this.lines.toArray(CACHE_ARR));
             pool.takeCareOf(hologram);
             return hologram;
         }

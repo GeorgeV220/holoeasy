@@ -24,15 +24,15 @@ import org.jetbrains.annotations.*;
 
 public class VersionUtil {
 
-    public static String VERSION;
+    public static final String VERSION;
 
-    public static String CLEAN_VERSION;
+    public static final VersionUtil.VersionEnum CLEAN_VERSION;
 
     static {
         String bpName = Bukkit.getServer().getClass().getPackage().getName();
         VERSION = bpName.substring(bpName.lastIndexOf(".") + 1);
-
-        CLEAN_VERSION = VERSION.substring(0, VERSION.length() - 3);
+        String clean = VERSION.substring(0, VERSION.length() - 3);
+        CLEAN_VERSION = VersionUtil.VersionEnum.valueOf(clean.toUpperCase());
     }
 
     public static boolean isCompatible(@NotNull VersionEnum ve){
@@ -40,11 +40,11 @@ public class VersionUtil {
     }
 
     public static boolean isAbove(@NotNull VersionEnum ve) {
-        return VersionEnum.valueOf(CLEAN_VERSION.toUpperCase()).getOrder() >= ve.getOrder();
+        return CLEAN_VERSION.getOrder() >= ve.getOrder();
     }
 
     public static boolean isBelow(@NotNull VersionEnum ve) {
-        return VersionEnum.valueOf(CLEAN_VERSION.toUpperCase()).getOrder() <= ve.getOrder();
+        return CLEAN_VERSION.getOrder() <= ve.getOrder();
     }
 
     public static boolean isBetween(@NotNull VersionEnum ve1, @NotNull VersionEnum ve2) {
@@ -64,9 +64,10 @@ public class VersionUtil {
         V1_15(8),
         V1_16(9),
         V1_17(10),
-        V1_18(11);
+        V1_18(11),
+        V1_19(12);
 
-        private int order;
+        private final int order;
 
         VersionEnum(int order) {
             this.order = order;

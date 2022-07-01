@@ -1,6 +1,6 @@
 # Hologram-Lib
 [![](https://jitpack.io/v/unldenis/Hologram-Lib.svg)](https://jitpack.io/#unldenis/Hologram-Lib) <br>
-Asynchronous, high-performance Minecraft Hologram library for 1.8-1.18 servers.
+Asynchronous, high-performance Minecraft Hologram library for 1.8-1.19 servers.
 ## Requirements
 This library can only be used on spigot servers higher or on version 1.8.8. The plugin <a href="https://www.spigotmc.org/resources/protocollib.1997/">ProtocolLib</a> is required on your server.
 ## How to use
@@ -53,31 +53,45 @@ public class ExampleHolograms implements Listener {
      */
     public ExampleHolograms(@NotNull Plugin plugin) {
         this.plugin = plugin;
-        this.hologramPool = new HologramPool(plugin, 70);
+        this.hologramPool = new HologramPool(plugin, 70, 0.5f, 5f);
     }
 
     /**
      * Appends a new Hologram to the pool.
      *
      * @param location  The location the Hologram will be spawned at
+     * @param excludedPlayer A player which will not see the Hologram for 10 seconds
      */
-    public void appendHOLO(@NotNull Location location) {
+    public void appendHOLO(@NotNull Location location, Player excludedPlayer) {
         // building the NPC
         Hologram hologram = Hologram.builder()
                 .location(location)
-                .addLine("Hello World!")
-                .addLine("Using Hologram-Lib")
-                .addLine("Hello %%player%%")
+                .addLine("Hello World!", false)
+                .addLine("Using Hologram-Lib", false)
+                .addLine("Hello %%player%%", true)
                 .addLine(new ItemStack(Material.IRON_BLOCK))
                 .addPlaceholder("%%player%%", Player::getName)
                 .build(hologramPool);
 
-        hologram.getLines().get(3).setAnimation(Animation.CIRCLE);
+        hologram.getLines().get(3).setAnimation(Animation.AnimationType.CIRCLE);
         // simple changing animating block and text
         timingBlock(hologram);
+
+        if (excludedPlayer != null) {
+            // adding the excluded player which will not see the Hologram
+            hologram.addExcludedPlayer(excludedPlayer);
+
+            // shows 10 seconds after theHologram
+            Bukkit.getScheduler().runTaskLater(plugin, () -> hologram.removeExcludedPlayer(excludedPlayer), 20L * 10);
+        }
     }
 
-    private final static Material[] materials = new Material[] { Material.IRON_BLOCK, Material.GOLD_BLOCK, Material.DIAMOND_BLOCK, Material.EMERALD_BLOCK};
+    private final static Queue<Material> materials = new ArrayDeque<>() {
+        {
+            addAll(Arrays.asList( Material.IRON_BLOCK, Material.GOLD_BLOCK, Material.DIAMOND_BLOCK, Material.EMERALD_BLOCK));
+        }
+    };
+
 
     /**
      * Update the block and the first line of text of the hologram
@@ -85,14 +99,12 @@ public class ExampleHolograms implements Listener {
      */
     private void timingBlock(Hologram hologram) {
         new BukkitRunnable() {
-            int j=1;
-            final TextLine firstLine = (TextLine) hologram.getLines().get(0);
             final ItemLine itemLine = (ItemLine) hologram.getLines().get(3);
             @Override
             public void run() {
-                if(j==materials.length) j=0;
-                firstLine.set(String.valueOf(j));
-                itemLine.set(new ItemStack(materials[j++]));
+                Material mat = materials.poll();
+                itemLine.set(new ItemStack(mat));
+                materials.offer(mat);
             }
         }
         .runTaskTimer(plugin, 30L, 30L);
@@ -117,9 +129,22 @@ public class ExampleHolograms implements Listener {
         Hologram holo = event.getHologram();
         Player player = event.getPlayer();
     }
+
+    /**
+     * Doing something when a Hologram is left-clicked by a certain player.
+     * @param e The event instance
+     */
+    @EventHandler
+    public void onHologramInteract(PlayerHologramInteractEvent e) {
+        Player player = e.getPlayer();
+        TextLine line = e.getLine();
+        player.sendMessage("Click at " + line.parse(player));
+    }
 }
 ```
 ## Preview
 https://user-images.githubusercontent.com/80055679/147889286-6d4006a0-677b-4066-a285-08e79d3fad9e.mp4
 #### Placeholder Preview
 ![2022-01-03_22 11 34](https://user-images.githubusercontent.com/80055679/147980899-fa7b8172-b0d8-4ab6-9eab-d33e9323fb63.png)
+#### Interact Preview
+![2022-06-12_18 39 23](https://user-images.githubusercontent.com/80055679/173243893-0f5568d4-c667-4311-b5ab-35d19ccc18e4.png)

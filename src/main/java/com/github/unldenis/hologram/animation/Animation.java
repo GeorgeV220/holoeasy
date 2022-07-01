@@ -19,24 +19,29 @@
 
 package com.github.unldenis.hologram.animation;
 
+import org.bukkit.*;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
-public abstract class Animation {
+public interface Animation {
 
-    public static final Animation CIRCLE = new CircleAnimation();
+    enum AnimationType {
+        CIRCLE(new CircleAnimation());
 
-    protected int entityID;
+        public final Animation type;
 
-    public abstract long delay();
+        AnimationType(Animation type) {
+            this.type = type;
+        }
 
-    public abstract void nextFrame(@NotNull Player player);
-
-    public abstract boolean async();
-
-    public abstract Animation clone();
-
-    public void setEntityID(int entityID) {
-        this.entityID = entityID;
     }
+
+    long delay();
+
+    void nextFrame(@NotNull Player player, int entityID, Location location);
+
+    boolean async();
+
+    Animation newInstance();
+
 }

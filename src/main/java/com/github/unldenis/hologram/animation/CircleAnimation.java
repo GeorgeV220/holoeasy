@@ -20,36 +20,28 @@
 package com.github.unldenis.hologram.animation;
 
 
-import com.comphenix.protocol.*;
-import com.comphenix.protocol.events.PacketContainer;
+import com.github.unldenis.hologram.packet.*;
+import org.bukkit.*;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
-import java.lang.reflect.InvocationTargetException;
 
-public class CircleAnimation extends Animation {
+public class CircleAnimation implements Animation {
 
     private float yaw=0;
 
     @Override
     public long delay() {
-        return 2L;
+        return 3L;
     }
 
     @Override
-    public void nextFrame(@NotNull Player player) {
+    public void nextFrame(@NotNull Player player, int entityID, Location location) {
         this.yaw+=10L;
-        PacketContainer pc = new PacketContainer(PacketType.Play.Server.ENTITY_LOOK);
-        pc.getIntegers().write(0, this.entityID);
-        pc.getBytes()
-                .write(0, (byte)getCompressedAngle(yaw))
-                .write(1, (byte) 0);
-        pc.getBooleans().write(0, true);
-        try {
-            ProtocolLibrary.getProtocolManager().sendServerPacket(player, pc);
-        } catch (InvocationTargetException e) {
-            e.printStackTrace();
-        }
+
+        PacketsFactory.get()
+                .rotatePackets(entityID, location, yaw)
+                .forEach(p -> p.send(player));
     }
 
     @Override
@@ -58,11 +50,8 @@ public class CircleAnimation extends Animation {
     }
 
     @Override
-    public Animation clone() {
+    public Animation newInstance() {
         return new CircleAnimation();
     }
 
-    private int getCompressedAngle(float value) {
-        return (int)(value * 256.0F / 360.0F);
-    }
 }
